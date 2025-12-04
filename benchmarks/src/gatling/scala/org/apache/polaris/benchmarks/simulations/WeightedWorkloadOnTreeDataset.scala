@@ -76,8 +76,8 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
   val refreshOauthForDuration: ScenarioBuilder =
     scenario("Authenticate every 30s using the Iceberg REST API")
       .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
-        feed(authActions.feeder())
-          .exec(authActions.authenticateAndSaveAccessToken)
+        feed(authActions.rootFeeder())
+          .exec(authActions.authRootAndSaveAccessToken)
           .pause(30.seconds)
       }
 

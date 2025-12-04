@@ -57,18 +57,40 @@ dataset.tree {
 
 ### Connection Parameters
 
-Connection settings are configured under `http` and `auth`:
+Connection settings are configured under `http`, `auth-root`, and `auth-principal`:
 
 ```hocon
 http {
   base-url = "http://localhost:8181"  # Service URL
 }
 
-auth {
-  client-id = null      # Required: OAuth2 client ID
-  client-secret = null  # Required: OAuth2 client secret
+auth-root {
+  client-id = null      # Required: OAuth2 root client ID for administrative operations
+  client-secret = null  # Required: OAuth2 root client secret
+}
+
+auth-principal {
+  name = "benchmarks"   # Name of the principal to create/use for benchmarks
 }
 ```
+
+#### Authentication Flow
+
+The benchmarks use a two-phase authentication approach:
+
+1. **Root Authentication**: Used for administrative setup
+   - Authenticate with root credentials
+   - Create the benchmark principal
+   - Create catalog roles and principal roles
+   - Grant privileges to catalog roles
+   - Assign catalog roles to principal roles
+   - Assign principal roles to the principal
+
+2. **Principal Authentication**: Used for actual benchmark operations
+   - Authenticate with the principal's credentials (obtained during creation)
+   - Execute all benchmark workloads with the principal's access token
+
+This separation ensures that benchmarks run with appropriate, limited privileges rather than root access.
 
 ### Workload Parameters
 
@@ -90,9 +112,13 @@ To customize the benchmark settings, create your own `application.conf` file and
 
 Example `application.conf`:
 ```hocon
-auth {
-  client-id = "your-client-id"
-  client-secret = "your-client-secret"
+auth-root {
+  client-id = "your-root-client-id"
+  client-secret = "your-root-client-secret"
+}
+
+auth-principal {
+  name = "benchmarks"
 }
 
 http {

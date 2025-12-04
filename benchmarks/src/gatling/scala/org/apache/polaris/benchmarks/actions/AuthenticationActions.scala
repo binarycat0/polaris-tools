@@ -48,31 +48,109 @@ case class AuthenticationActions(
 ) {
   private val logger = LoggerFactory.getLogger(getClass)
 
+  // Store principal credentials after creation
+  private val principalClientId = new AtomicReference[String](null)
+  private val principalClientSecret = new AtomicReference[String](null)
+
   /**
-   * Creates a Gatling Feeder that provides authentication credentials. The feeder continuously
-   * supplies client ID and client secret from the connection parameters for use in authentication
+   * Creates a Gatling Feeder that provides root authentication credentials. The feeder continuously
+   * supplies root client ID and client secret from the connection parameters for use in authentication
    * requests.
    *
-   * @return An iterator providing client credentials
+   * @return An iterator providing root client credentials
    */
-  def feeder(): Feeder[String] = Iterator.continually(
+  def rootFeeder(): Feeder[String] = Iterator.continually(
     Map(
-      "clientId" -> cp.clientId,
-      "clientSecret" -> cp.clientSecret
+      "clientId" -> cp.rootClientId,
+      "clientSecret" -> cp.rootClientSecret
     )
   )
 
   /**
-   * Authenticates using client credentials and saves the access token as a session attribute. The
-   * credentials are defined in the [[AuthenticationActions.feeder]]. This operation performs an
-   * OAuth2 client credentials flow, requesting full principal roles, and stores the received access
-   * token in both the Gatling session and the shared AtomicReference.
+   * Creates a Gatling Feeder that provides the principal name from configuration.
+   * This is used when creating the principal.
+   *
+   * @return An iterator providing the principal name
+   */
+  def principalNameFeeder(): Feeder[String] = Iterator.continually(
+    Map(
+      "principalName" -> cp.principalName
+    )
+  )
+
+  /**
+   * Creates a Gatling Feeder that provides principal authentication credentials. The feeder continuously
+   * supplies principal client ID and client secret that were obtained when the principal was created.
+   *
+   * @return An iterator providing principal client credentials
+   */
+  def principalFeeder(): Feeder[String] = Iterator.continually(
+    Map(
+      "clientId" -> principalClientId.get(),
+      "clientSecret" -> principalClientSecret.get()
+    )
+  )
+
+  /**
+   * Stores principal credentials in the atomic references for later use in authentication.
+   * This should be called after creating a principal to capture its credentials from the session.
+   * The credentials are expected to be in session variables "principalClientId" and "principalClientSecret".
+   */
+  val savePrincipalCredentials: ChainBuilder = exec { session =>
+    session("principalClientId").asOption[String].foreach { id =>
+      principalClientId.set(id)
+      logger.info(s"Saved principal client ID: $id")
+    }
+    session("principalClientSecret").asOption[String].foreach { secret =>
+      principalClientSecret.set(secret)
+      logger.info("Saved principal client secret")
+    }
+    session
+  }
+
+  /**
+   * Authenticates using principal credentials and saves the access token as a session attribute. The
+   * credentials should be provided via [[principalFeeder]]. This operation performs an OAuth2 client
+   * credentials flow, requesting full principal roles, and stores the received access token in
+   * both the Gatling session and the shared AtomicReference.
+   *
+   * Use this for benchmark operations after the principal has been set up with necessary roles and grants.
    *
    * There is no limit to the maximum number of users that can authenticate concurrently.
    */
-  val authenticateAndSaveAccessToken: ChainBuilder =
-    retryOnHttpStatus(maxRetries, retryableHttpCodes, "Authenticate")(
-      http("Authenticate")
+  val authPrincipalAndSaveAccessToken: ChainBuilder =
+    retryOnHttpStatus(maxRetries, retryableHttpCodes, "Authenticate Principal")(
+      http("Authenticate Principal")
+        .post("/api/catalog/v1/oauth/tokens")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .formParam("grant_type", "client_credentials")
+        .formParam("client_id", "#{clientId}")
+        .formParam("client_secret", "#{clientSecret}")
+        .formParam("scope", "PRINCIPAL_ROLE:ALL")
+        .saveHttpStatusCode()
+        .check(status.is(200))
+        .check(jsonPath("$.access_token").saveAs("accessToken"))
+    )
+      .exec { session =>
+        if (session.contains("accessToken")) {
+          accessToken.set(session("accessToken").as[String])
+        }
+        session
+      }
+
+  /**
+   * Authenticates using root credentials and saves the access token as a session attribute. The
+   * credentials should be provided via [[rootFeeder]]. This operation performs an OAuth2 client
+   * credentials flow, requesting full principal roles, and stores the received access token in
+   * both the Gatling session and the shared AtomicReference.
+   *
+   * Use this for administrative operations (creating principals, roles, grants).
+   *
+   * There is no limit to the maximum number of users that can authenticate concurrently.
+   */
+  val authRootAndSaveAccessToken: ChainBuilder =
+    retryOnHttpStatus(maxRetries, retryableHttpCodes, "Authenticate Root")(
+      http("Authenticate Root")
         .post("/api/catalog/v1/oauth/tokens")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .formParam("grant_type", "client_credentials")

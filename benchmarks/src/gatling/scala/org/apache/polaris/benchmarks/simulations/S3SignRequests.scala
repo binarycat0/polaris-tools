@@ -66,10 +66,10 @@ class S3SignRequests extends Simulation {
       .exec(authActions.restoreAccessTokenInSession)
       .exec { session =>
         session
-          .set("principalName", cp.clientId)
-          .set("principalRoleName", s"${cp.clientId}_role")
+          .set("principalName", cp.principalName)
+          .set("principalRoleName", s"${cp.principalName}_role")
           .set("catalogName", "C_0")
-          .set("catalogRoleName", s"${cp.clientId}_catalog_role")
+          .set("catalogRoleName", s"${cp.principalName}_catalog_role")
       }
       .exec(principalActions.setupPrincipalWithAccess)
 
@@ -82,8 +82,8 @@ class S3SignRequests extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get())(
-        feed(authActions.feeder())
-          .exec(authActions.authenticateAndSaveAccessToken)
+        feed(authActions.rootFeeder())
+          .exec(authActions.authRootAndSaveAccessToken)
           .pause(1.minute)
       )
 

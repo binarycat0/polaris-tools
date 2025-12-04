@@ -86,8 +86,8 @@ class ReadUpdateTreeDataset extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get()) {
-        feed(authActions.feeder())
-          .exec(authActions.authenticateAndSaveAccessToken)
+        feed(authActions.rootFeeder())
+          .exec(authActions.authRootAndSaveAccessToken)
           .pause(1.minute)
       }
 

@@ -27,13 +27,15 @@ object BenchmarkConfig {
     val config: Config = ConfigFactory.load().withFallback(ConfigFactory.load("benchmark-defaults"))
 
     val http: Config = config.getConfig("http")
-    val auth: Config = config.getConfig("auth")
+    val authRoot: Config = config.getConfig("auth-root")
+    val authPrincipal: Config = config.getConfig("auth-principal")
     val dataset: Config = config.getConfig("dataset.tree")
     val workload: Config = config.getConfig("workload")
 
     val connectionParams = ConnectionParameters(
-      auth.getString("client-id"),
-      auth.getString("client-secret"),
+      authRoot.getString("client-id"),
+      authRoot.getString("client-secret"),
+      authPrincipal.getString("name"),
       http.getString("base-url")
     )
 
