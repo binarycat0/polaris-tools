@@ -18,11 +18,20 @@
  */
 package org.apache.polaris.benchmarks.parameters
 
-case class WorkloadParameters(
-    createCommits: CreateCommitsParameters,
-    readTreeDataset: ReadTreeDatasetParameters,
-    createTreeDataset: CreateTreeDatasetParameters,
-    readUpdateTreeDataset: ReadUpdateTreeDatasetParameters,
-    weightedWorkloadOnTreeDataset: WeightedWorkloadOnTreeDatasetParameters,
-    s3SignRequests: S3SignRequestsParameters
-) {}
+/**
+ * Case class to hold the parameters for the S3SignRequests simulation.
+ *
+ * @param throughput The number of S3 sign requests to perform per second.
+ * @param durationInMinutes The duration of the simulation in minutes.
+ * @param region The AWS region for S3 requests.
+ */
+case class S3SignRequestsParameters(
+    throughput: Int,
+    durationInMinutes: Int,
+    region: String
+) {
+  require(throughput > 0, "Throughput must be positive")
+  require(durationInMinutes > 0, "Duration in minutes must be positive")
+  require(region.nonEmpty, "Region cannot be empty")
+}
+
