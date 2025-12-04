@@ -20,6 +20,8 @@ package org.apache.polaris.benchmarks.parameters
 
 import com.typesafe.config.{Config, ConfigFactory}
 
+import scala.jdk.CollectionConverters._
+
 object BenchmarkConfig {
   val config: BenchmarkConfig = apply()
 
@@ -29,6 +31,7 @@ object BenchmarkConfig {
     val http: Config = config.getConfig("http")
     val authRoot: Config = config.getConfig("auth-root")
     val authPrincipal: Config = config.getConfig("auth-principal")
+    val catalog: Config = config.getConfig("catalog")
     val dataset: Config = config.getConfig("dataset.tree")
     val workload: Config = config.getConfig("workload")
 
@@ -80,6 +83,10 @@ object BenchmarkConfig {
       )
     }
 
+    val catalogParams = CatalogParameters(
+      catalog.getStringList("privileges").asScala.toSeq
+    )
+
     val datasetParams = DatasetParameters(
       dataset.getInt("num-catalogs"),
       dataset.getString("default-base-location"),
@@ -97,12 +104,13 @@ object BenchmarkConfig {
       dataset.getString("storage-config-info")
     )
 
-    BenchmarkConfig(connectionParams, workloadParams, datasetParams)
+    BenchmarkConfig(connectionParams, catalogParams, workloadParams, datasetParams)
   }
 }
 
 case class BenchmarkConfig(
     connectionParameters: ConnectionParameters,
+    catalogParameters: CatalogParameters,
     workloadParameters: WorkloadParameters,
     datasetParameters: DatasetParameters
 ) {}

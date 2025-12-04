@@ -26,7 +26,7 @@ import org.apache.polaris.benchmarks.RetryOnHttpCodes.{
   retryOnHttpStatus,
   HttpRequestBuilderWithStatusSave
 }
-import org.apache.polaris.benchmarks.parameters.DatasetParameters
+import org.apache.polaris.benchmarks.parameters.{CatalogParameters, DatasetParameters}
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.atomic.AtomicReference
@@ -35,12 +35,14 @@ import java.util.concurrent.atomic.AtomicReference
  * Actions for performance testing catalog operations in Apache Iceberg. This class provides methods
  * to create and fetch catalogs.
  *
+ * @param cp Catalog parameters controlling catalog configuration
  * @param dp Dataset parameters controlling the dataset generation
  * @param accessToken Reference to the authentication token for API requests
  * @param maxRetries Maximum number of retry attempts for failed operations
  * @param retryableHttpCodes HTTP status codes that should trigger a retry
  */
 case class CatalogActions(
+    cp: CatalogParameters,
     dp: DatasetParameters,
     accessToken: AtomicReference[String],
     maxRetries: Int = 10,
@@ -129,4 +131,56 @@ case class CatalogActions(
       .header("Content-Type", "application/json")
       .check(status.is(200))
   )
+
+  /**
+   * Creates a catalog role if it doesn't already exist. Returns 201 on success, 409 if already exists.
+   */
+  val createCatalogRole: ChainBuilder = exec(
+    http("Create Catalog Role")
+      .post("/api/management/v1/catalogs/#{catalogName}/catalog-roles")
+      .header("Authorization", "Bearer #{accessToken}")
+      .header("Content-Type", "application/json")
+      .body(
+        StringBody(
+          """{
+            |  "catalogRole": {
+            |    "name": "#{catalogRoleName}"
+            |  }
+            |}""".stripMargin
+        )
+      )
+      .check(status.in(201, 409))
+  )
+
+  /**
+   * Grants configured catalog privileges to a catalog role. The privileges are read from the
+   * catalog configuration. According to the API spec, this is a PUT request with an
+   * AddGrantRequest body containing a GrantResource.
+   */
+  val grantCatalogPrivileges: ChainBuilder = {
+    val privilegeChains = cp.privileges.map { privilege =>
+      exec(
+        http(s"Grant $privilege Privilege")
+          .put("/api/management/v1/catalogs/#{catalogName}/catalog-roles/#{catalogRoleName}/grants")
+          .header("Authorization", "Bearer #{accessToken}")
+          .header("Content-Type", "application/json")
+          .body(
+            StringBody(
+              s"""{
+                 |  "grant": {
+                 |    "type": "catalog",
+                 |    "privilege": "$privilege"
+                 |  }
+                 |}""".stripMargin
+            )
+          )
+          .check(status.in(201, 403, 404))
+      )
+    }
+
+    // Chain all privilege grants together
+    privilegeChains.foldLeft(exec(session => session))((chain, privilegeChain) =>
+      chain.exec(privilegeChain)
+    )
+  }
 }

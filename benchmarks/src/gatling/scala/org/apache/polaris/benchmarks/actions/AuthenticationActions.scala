@@ -36,13 +36,15 @@ import java.util.concurrent.atomic.AtomicReference
  * authenticate and manage access tokens for API requests.
  *
  * @param cp Connection parameters containing client credentials
- * @param accessToken Reference to the authentication token shared across actions
+ * @param rootAccessToken Reference to the root authentication token shared across actions
+ * @param principalAccessToken Reference to the principal authentication token shared across actions
  * @param maxRetries Maximum number of retry attempts for failed operations
  * @param retryableHttpCodes HTTP status codes that should trigger a retry
  */
 case class AuthenticationActions(
     cp: ConnectionParameters,
-    accessToken: AtomicReference[String],
+    rootAccessToken: AtomicReference[String],
+    principalAccessToken: AtomicReference[String],
     maxRetries: Int = 10,
     retryableHttpCodes: Set[Int] = Set(500)
 ) {
@@ -67,20 +69,9 @@ case class AuthenticationActions(
   )
 
   /**
-   * Creates a Gatling Feeder that provides the principal name from configuration.
-   * This is used when creating the principal.
-   *
-   * @return An iterator providing the principal name
-   */
-  def principalNameFeeder(): Feeder[String] = Iterator.continually(
-    Map(
-      "principalName" -> cp.principalName
-    )
-  )
-
-  /**
    * Creates a Gatling Feeder that provides principal authentication credentials. The feeder continuously
    * supplies principal client ID and client secret that were obtained when the principal was created.
+   * These credentials are saved by calling savePrincipalCredentials after creating the principal.
    *
    * @return An iterator providing principal client credentials
    */
@@ -112,7 +103,7 @@ case class AuthenticationActions(
    * Authenticates using principal credentials and saves the access token as a session attribute. The
    * credentials should be provided via [[principalFeeder]]. This operation performs an OAuth2 client
    * credentials flow, requesting full principal roles, and stores the received access token in
-   * both the Gatling session and the shared AtomicReference.
+   * both the Gatling session and the shared principal AtomicReference.
    *
    * Use this for benchmark operations after the principal has been set up with necessary roles and grants.
    *
@@ -133,7 +124,7 @@ case class AuthenticationActions(
     )
       .exec { session =>
         if (session.contains("accessToken")) {
-          accessToken.set(session("accessToken").as[String])
+          principalAccessToken.set(session("accessToken").as[String])
         }
         session
       }
@@ -142,7 +133,7 @@ case class AuthenticationActions(
    * Authenticates using root credentials and saves the access token as a session attribute. The
    * credentials should be provided via [[rootFeeder]]. This operation performs an OAuth2 client
    * credentials flow, requesting full principal roles, and stores the received access token in
-   * both the Gatling session and the shared AtomicReference.
+   * both the Gatling session and the shared root AtomicReference.
    *
    * Use this for administrative operations (creating principals, roles, grants).
    *
@@ -163,16 +154,24 @@ case class AuthenticationActions(
     )
       .exec { session =>
         if (session.contains("accessToken")) {
-          accessToken.set(session("accessToken").as[String])
+          rootAccessToken.set(session("accessToken").as[String])
         }
         session
       }
 
   /**
-   * Restores the current access token from the shared reference into the Gatling session. This
-   * operation is useful when a scenario needs to reuse an authentication token from a previous
+   * Sets the root access token from the shared reference into the Gatling session. This
+   * operation is useful when a scenario needs to reuse the root authentication token from a previous
    * scenario.
    */
-  val restoreAccessTokenInSession: ChainBuilder =
-    exec(session => session.set("accessToken", accessToken.get()))
+  val setRootAccessTokenInSession: ChainBuilder =
+    exec(session => session.set("accessToken", rootAccessToken.get()))
+
+  /**
+   * Sets the principal access token from the shared reference into the Gatling session. This
+   * operation is useful when a scenario needs to reuse the principal authentication token from a previous
+   * scenario.
+   */
+  val setPrincipalAccessTokenInSession: ChainBuilder =
+    exec(session => session.set("accessToken", principalAccessToken.get()))
 }

@@ -65,10 +65,11 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
   // --------------------------------------------------------------------------------
   // Helper values
   // --------------------------------------------------------------------------------
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
 
-  private val authActions = AuthenticationActions(cp, accessToken)
-  private val tblActions = TableActions(dp, wp, accessToken)
+  private val authActions = AuthenticationActions(cp, rootAccessToken, principalAccessToken)
+  private val tblActions = TableActions(dp, wp, principalAccessToken)
 
   // --------------------------------------------------------------------------------
   // Authentication related workloads
@@ -76,14 +77,14 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
   val refreshOauthForDuration: ScenarioBuilder =
     scenario("Authenticate every 30s using the Iceberg REST API")
       .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
-        feed(authActions.rootFeeder())
-          .exec(authActions.authRootAndSaveAccessToken)
+        feed(authActions.principalFeeder())
+          .exec(authActions.authPrincipalAndSaveAccessToken)
           .pause(30.seconds)
       }
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null) {
+      .asLongAs(_ => principalAccessToken.get() == null) {
         pause(1.second)
       }
 
@@ -105,7 +106,7 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
         val rnp =
           RandomNumberProvider(wp.weightedWorkloadOnTreeDataset.seed, ((i + 1) * 1000) + threadId)
         scenario(s"Reader-$i-$threadId")
-          .exec(authActions.restoreAccessTokenInSession)
+          .exec(authActions.setPrincipalAccessTokenInSession)
           .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
             exec { session =>
               val tableIndex = dist.sample(dp.maxPossibleTables, rnp)
@@ -136,7 +137,7 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
         val rnp =
           RandomNumberProvider(wp.weightedWorkloadOnTreeDataset.seed, ((i + 1) * 2000) + threadId)
         scenario(s"Writer-$i-$threadId")
-          .exec(authActions.restoreAccessTokenInSession)
+          .exec(authActions.setPrincipalAccessTokenInSession)
           .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
             exec { session =>
               val tableIndex = dist.sample(dp.maxPossibleTables, rnp)

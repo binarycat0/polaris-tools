@@ -52,12 +52,13 @@ class CreateCommits extends Simulation {
   // --------------------------------------------------------------------------------
   // Helper values
   // --------------------------------------------------------------------------------
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
   private val shouldRefreshToken: AtomicBoolean = new AtomicBoolean(true)
 
-  private val authActions = AuthenticationActions(cp, accessToken)
-  private val tableActions = TableActions(dp, wp, accessToken)
-  private val viewActions = ViewActions(dp, wp, accessToken)
+  private val authActions = AuthenticationActions(cp, rootAccessToken, principalAccessToken)
+  private val tableActions = TableActions(dp, wp, principalAccessToken)
+  private val viewActions = ViewActions(dp, wp, principalAccessToken)
 
   // --------------------------------------------------------------------------------
   // Authentication related workloads:
@@ -68,14 +69,14 @@ class CreateCommits extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get())(
-        feed(authActions.rootFeeder())
-          .exec(authActions.authRootAndSaveAccessToken)
+        feed(authActions.principalFeeder())
+          .exec(authActions.authPrincipalAndSaveAccessToken)
           .pause(1.minute)
       )
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null)(
+      .asLongAs(_ => principalAccessToken.get() == null)(
         pause(1.second)
       )
 
@@ -93,7 +94,7 @@ class CreateCommits extends Simulation {
   // --------------------------------------------------------------------------------
   val tableUpdateScenario: ScenarioBuilder =
     scenario("Create table commits by updating properties")
-      .exec(authActions.restoreAccessTokenInSession)
+      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(tableActions.propertyUpdateFeeder())
       .exec(tableActions.updateTable)
 
@@ -104,7 +105,7 @@ class CreateCommits extends Simulation {
   // --------------------------------------------------------------------------------
   val viewUpdateScenario: ScenarioBuilder =
     scenario("Create view commits by updating properties")
-      .exec(authActions.restoreAccessTokenInSession)
+      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(viewActions.propertyUpdateFeeder())
       .exec(viewActions.updateView)
 

@@ -42,6 +42,7 @@ class ReadTreeDataset extends Simulation {
   // Load parameters
   // --------------------------------------------------------------------------------
   private val cp = config.connectionParameters
+  private val catParams = config.catalogParameters
   private val dp = config.datasetParameters
   val wp: WorkloadParameters = config.workloadParameters
 
@@ -49,14 +50,15 @@ class ReadTreeDataset extends Simulation {
   // Helper values
   // --------------------------------------------------------------------------------
   private val numNamespaces: Int = dp.nAryTree.numberOfNodes
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
   private val shouldRefreshToken: AtomicBoolean = new AtomicBoolean(true)
 
-  private val authenticationActions = AuthenticationActions(cp, accessToken)
-  private val catalogActions = CatalogActions(dp, accessToken)
-  private val namespaceActions = NamespaceActions(dp, wp, accessToken)
-  private val tableActions = TableActions(dp, wp, accessToken)
-  private val viewActions = ViewActions(dp, wp, accessToken)
+  private val authenticationActions = AuthenticationActions(cp, rootAccessToken, principalAccessToken)
+  private val catalogActions = CatalogActions(catParams, dp, principalAccessToken)
+  private val namespaceActions = NamespaceActions(dp, wp, principalAccessToken)
+  private val tableActions = TableActions(dp, wp, principalAccessToken)
+  private val viewActions = ViewActions(dp, wp, principalAccessToken)
 
   private val verifiedCatalogs = new AtomicInteger()
   private val verifiedNamespaces = new AtomicInteger()
@@ -72,14 +74,14 @@ class ReadTreeDataset extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get()) {
-        feed(authenticationActions.rootFeeder())
-          .exec(authenticationActions.authRootAndSaveAccessToken)
+        feed(authenticationActions.principalFeeder())
+          .exec(authenticationActions.authPrincipalAndSaveAccessToken)
           .pause(1.minute)
       }
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null) {
+      .asLongAs(_ => principalAccessToken.get() == null) {
         pause(1.second)
       }
 
@@ -94,7 +96,7 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify each catalog
   // --------------------------------------------------------------------------------
   private val verifyCatalogs = scenario("Verify catalogs using the Polaris Management REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
       verifiedCatalogs.getAndIncrement() < dp.numCatalogs && session.contains("accessToken")
     )(
@@ -106,7 +108,7 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify namespaces
   // --------------------------------------------------------------------------------
   private val verifyNamespaces = scenario("Verify namespaces using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
       verifiedNamespaces.getAndIncrement() < numNamespaces && session.contains("accessToken")
     )(
@@ -120,7 +122,7 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify tables
   // --------------------------------------------------------------------------------
   private val verifyTables = scenario("Verify tables using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
       verifiedTables.getAndIncrement() < dp.numTables && session.contains("accessToken")
     )(
@@ -134,7 +136,7 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify views
   // --------------------------------------------------------------------------------
   private val verifyViews = scenario("Verify views using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
       verifiedViews.getAndIncrement() < dp.numViews && session.contains("accessToken")
     )(

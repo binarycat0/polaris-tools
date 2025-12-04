@@ -21,7 +21,7 @@ package org.apache.polaris.benchmarks.simulations
 import io.gatling.core.Predef._
 import io.gatling.core.structure.ScenarioBuilder
 import io.gatling.http.Predef.http
-import org.apache.polaris.benchmarks.actions.{AuthenticationActions, PrincipalActions, S3SignActions}
+import org.apache.polaris.benchmarks.actions.{AuthenticationActions, CatalogActions, PrincipalActions, S3SignActions}
 import org.apache.polaris.benchmarks.parameters.BenchmarkConfig.config
 import org.apache.polaris.benchmarks.parameters.{
   ConnectionParameters,
@@ -43,19 +43,22 @@ class S3SignRequests extends Simulation {
   // --------------------------------------------------------------------------------
   // Load parameters
   // --------------------------------------------------------------------------------
-  val cp: ConnectionParameters = config.connectionParameters
+  val connParams: ConnectionParameters = config.connectionParameters
+  val catParams = config.catalogParameters
   val dp: DatasetParameters = config.datasetParameters
   val wp: WorkloadParameters = config.workloadParameters
 
   // --------------------------------------------------------------------------------
   // Helper values
   // --------------------------------------------------------------------------------
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
   private val shouldRefreshToken: AtomicBoolean = new AtomicBoolean(true)
 
-  private val authActions = AuthenticationActions(cp, accessToken)
-  private val principalActions = PrincipalActions(accessToken)
-  private val s3SignActions = S3SignActions(dp, wp, accessToken)
+  private val authActions = AuthenticationActions(connParams, rootAccessToken, principalAccessToken)
+  private val catalogActions = CatalogActions(catParams, dp, rootAccessToken)
+  private val principalActions = PrincipalActions(rootAccessToken, authActions)
+  private val s3SignActions = S3SignActions(dp, wp, principalAccessToken)
 
   // --------------------------------------------------------------------------------
   // Principal setup scenario:
@@ -63,15 +66,18 @@ class S3SignRequests extends Simulation {
   // --------------------------------------------------------------------------------
   val setupPrincipal: ScenarioBuilder =
     scenario("Setup principal with catalog access")
-      .exec(authActions.restoreAccessTokenInSession)
+      .exec(authActions.setRootAccessTokenInSession)
       .exec { session =>
         session
-          .set("principalName", cp.principalName)
-          .set("principalRoleName", s"${cp.principalName}_role")
+          .set("principalName", connParams.principalName)
+          .set("principalRoleName", s"${connParams.principalName}_role")
           .set("catalogName", "C_0")
-          .set("catalogRoleName", s"${cp.principalName}_catalog_role")
+          .set("catalogRoleName", s"${connParams.principalName}_catalog_role")
       }
-      .exec(principalActions.setupPrincipalWithAccess)
+      .exec(principalActions.setupPrincipalWithAccess(
+        catalogActions.createCatalogRole,
+        catalogActions.grantCatalogPrivileges
+      ))
 
   // --------------------------------------------------------------------------------
   // Authentication related workloads:
@@ -82,14 +88,14 @@ class S3SignRequests extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get())(
-        feed(authActions.rootFeeder())
-          .exec(authActions.authRootAndSaveAccessToken)
+        feed(authActions.principalFeeder())
+          .exec(authActions.authPrincipalAndSaveAccessToken)
           .pause(1.minute)
       )
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null)(
+      .asLongAs(_ => principalAccessToken.get() == null)(
         pause(1.second)
       )
 
@@ -107,7 +113,7 @@ class S3SignRequests extends Simulation {
   // --------------------------------------------------------------------------------
   val s3SignScenario: ScenarioBuilder =
     scenario("Sign S3 requests for table files")
-      .exec(authActions.restoreAccessTokenInSession)
+      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(s3SignActions.s3SignFeeder())
       .exec(s3SignActions.fetchTableLocation)
       .exec(s3SignActions.signS3Request)
@@ -116,7 +122,7 @@ class S3SignRequests extends Simulation {
   // Build up the HTTP protocol configuration and set up the simulation
   // --------------------------------------------------------------------------------
   private val httpProtocol = http
-    .baseUrl(cp.baseUrl)
+    .baseUrl(connParams.baseUrl)
     .acceptHeader("application/json")
     .contentTypeHeader("application/json")
 

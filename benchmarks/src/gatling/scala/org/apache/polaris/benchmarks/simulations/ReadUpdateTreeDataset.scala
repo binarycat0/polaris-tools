@@ -53,14 +53,16 @@ class ReadUpdateTreeDataset extends Simulation {
   // --------------------------------------------------------------------------------
   // Helper values
   // --------------------------------------------------------------------------------
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
   private val shouldRefreshToken: AtomicBoolean = new AtomicBoolean(true)
 
-  private val authActions = AuthenticationActions(cp, accessToken)
-  private val catActions = CatalogActions(dp, accessToken)
-  private val nsActions = NamespaceActions(dp, wp, accessToken)
-  private val tblActions = TableActions(dp, wp, accessToken)
-  private val viewActions = ViewActions(dp, wp, accessToken)
+  private val catParams = config.catalogParameters
+  private val authActions = AuthenticationActions(cp, rootAccessToken, principalAccessToken)
+  private val catActions = CatalogActions(catParams, dp, principalAccessToken)
+  private val nsActions = NamespaceActions(dp, wp, principalAccessToken)
+  private val tblActions = TableActions(dp, wp, principalAccessToken)
+  private val viewActions = ViewActions(dp, wp, principalAccessToken)
 
   private val nsListFeeder = new CircularIterator(nsActions.namespaceIdentityFeeder)
   private val nsExistsFeeder = new CircularIterator(nsActions.namespaceIdentityFeeder)
@@ -86,14 +88,14 @@ class ReadUpdateTreeDataset extends Simulation {
   val continuouslyRefreshOauthToken: ScenarioBuilder =
     scenario("Authenticate every minute using the Iceberg REST API")
       .asLongAs(_ => shouldRefreshToken.get()) {
-        feed(authActions.rootFeeder())
-          .exec(authActions.authRootAndSaveAccessToken)
+        feed(authActions.principalFeeder())
+          .exec(authActions.authPrincipalAndSaveAccessToken)
           .pause(1.minute)
       }
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null) {
+      .asLongAs(_ => principalAccessToken.get() == null) {
         pause(1.second)
       }
 
@@ -109,7 +111,7 @@ class ReadUpdateTreeDataset extends Simulation {
   // --------------------------------------------------------------------------------
   val readWriteScenario: ScenarioBuilder =
     scenario("Read and write entities using the Iceberg REST API")
-      .exec(authActions.restoreAccessTokenInSession)
+      .exec(authActions.setPrincipalAccessTokenInSession)
       .randomSwitch(
         wp.readUpdateTreeDataset.gatlingReadRatio -> group("Read")(
           uniformRandomSwitch(

@@ -44,6 +44,7 @@ class CreateTreeDataset extends Simulation {
   // Load parameters
   // --------------------------------------------------------------------------------
   val cp: ConnectionParameters = config.connectionParameters
+  val catParams = config.catalogParameters
   val dp: DatasetParameters = config.datasetParameters
   val wp: WorkloadParameters = config.workloadParameters
 
@@ -51,14 +52,15 @@ class CreateTreeDataset extends Simulation {
   // Helper values
   // --------------------------------------------------------------------------------
   private val numNamespaces: Int = dp.nAryTree.numberOfNodes
-  private val accessToken: AtomicReference[String] = new AtomicReference()
+  private val rootAccessToken: AtomicReference[String] = new AtomicReference()
+  private val principalAccessToken: AtomicReference[String] = new AtomicReference()
   private val shouldRefreshToken: AtomicBoolean = new AtomicBoolean(true)
 
-  private val authenticationActions = AuthenticationActions(cp, accessToken, 5, Set(500))
-  private val catalogActions = CatalogActions(dp, accessToken, 0, Set())
-  private val namespaceActions = NamespaceActions(dp, wp, accessToken, 5, Set(500))
-  private val tableActions = TableActions(dp, wp, accessToken, 0, Set())
-  private val viewActions = ViewActions(dp, wp, accessToken, 0, Set())
+  private val authenticationActions = AuthenticationActions(cp, rootAccessToken, principalAccessToken, 5, Set(500))
+  private val catalogActions = CatalogActions(catParams, dp, rootAccessToken, 0, Set())
+  private val namespaceActions = NamespaceActions(dp, wp, rootAccessToken, 5, Set(500))
+  private val tableActions = TableActions(dp, wp, rootAccessToken, 0, Set())
+  private val viewActions = ViewActions(dp, wp, rootAccessToken, 0, Set())
 
   private val createdCatalogs = new AtomicInteger()
   private val createdNamespaces = new AtomicInteger()
@@ -81,7 +83,7 @@ class CreateTreeDataset extends Simulation {
 
   val waitForAuthentication: ScenarioBuilder =
     scenario("Wait for the authentication token to be available")
-      .asLongAs(_ => accessToken.get() == null) {
+      .asLongAs(_ => rootAccessToken.get() == null) {
         pause(1.second)
       }
 
@@ -97,7 +99,7 @@ class CreateTreeDataset extends Simulation {
   // --------------------------------------------------------------------------------
   val createCatalogs: ScenarioBuilder =
     scenario("Create catalogs using the Polaris Management REST API")
-      .exec(authenticationActions.restoreAccessTokenInSession)
+      .exec(authenticationActions.setRootAccessTokenInSession)
       .asLongAs(session =>
         createdCatalogs.getAndIncrement() < dp.numCatalogs && session.contains("accessToken")
       )(
@@ -109,7 +111,7 @@ class CreateTreeDataset extends Simulation {
   // Workload: Create namespaces
   // --------------------------------------------------------------------------------
   val createNamespaces: ScenarioBuilder = scenario("Create namespaces using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setRootAccessTokenInSession)
     .asLongAs(session =>
       createdNamespaces.getAndIncrement() < numNamespaces && session.contains("accessToken")
     )(
@@ -121,7 +123,7 @@ class CreateTreeDataset extends Simulation {
   // Workload: Create tables
   // --------------------------------------------------------------------------------
   val createTables: ScenarioBuilder = scenario("Create tables using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setRootAccessTokenInSession)
     .asLongAs(session =>
       createdTables.getAndIncrement() < dp.numTables && session.contains("accessToken")
     )(
@@ -133,7 +135,7 @@ class CreateTreeDataset extends Simulation {
   // Workload: Create views
   // --------------------------------------------------------------------------------
   val createViews: ScenarioBuilder = scenario("Create views using the Iceberg REST API")
-    .exec(authenticationActions.restoreAccessTokenInSession)
+    .exec(authenticationActions.setRootAccessTokenInSession)
     .asLongAs(session =>
       createdViews.getAndIncrement() < dp.numViews && session.contains("accessToken")
     )(

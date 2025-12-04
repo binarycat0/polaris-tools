@@ -30,8 +30,12 @@ import java.util.concurrent.atomic.AtomicReference
  * This class provides methods to set up the necessary access control for benchmarks.
  *
  * @param accessToken Reference to the authentication token shared across actions
+ * @param authActions Reference to authentication actions for saving principal credentials
  */
-case class PrincipalActions(accessToken: AtomicReference[String]) {
+case class PrincipalActions(
+    accessToken: AtomicReference[String],
+    authActions: AuthenticationActions
+) {
   private val logger = LoggerFactory.getLogger(getClass)
 
   /**
@@ -54,12 +58,8 @@ case class PrincipalActions(accessToken: AtomicReference[String]) {
         )
       )
       .check(status.in(201, 409))
-      .checkIf(status.is(201)) {
-        jsonPath("$.credentials.clientId").saveAs("principalClientId")
-      }
-      .checkIf(status.is(201)) {
-        jsonPath("$.credentials.clientSecret").saveAs("principalClientSecret")
-      }
+      .check(jsonPath("$.credentials.clientId").optional.saveAs("principalClientId"))
+      .check(jsonPath("$.credentials.clientSecret").optional.saveAs("principalClientSecret"))
   )
 
   /**
@@ -75,26 +75,6 @@ case class PrincipalActions(accessToken: AtomicReference[String]) {
           """{
             |  "principalRole": {
             |    "name": "#{principalRoleName}"
-            |  }
-            |}""".stripMargin
-        )
-      )
-      .check(status.in(201, 409))
-  )
-
-  /**
-   * Creates a catalog role if it doesn't already exist. Returns 201 on success, 409 if already exists.
-   */
-  val createCatalogRole: ChainBuilder = exec(
-    http("Create Catalog Role")
-      .post("/api/management/v1/catalogs/#{catalogName}/catalog-roles")
-      .header("Authorization", "Bearer #{accessToken}")
-      .header("Content-Type", "application/json")
-      .body(
-        StringBody(
-          """{
-            |  "catalogRole": {
-            |    "name": "#{catalogRoleName}"
             |  }
             |}""".stripMargin
         )
@@ -147,37 +127,22 @@ case class PrincipalActions(accessToken: AtomicReference[String]) {
   )
 
   /**
-   * Grants CATALOG_MANAGE_CONTENT privilege to a catalog role. According to the API spec,
-   * this is a PUT request with an AddGrantRequest body containing a GrantResource.
-   */
-  val grantCatalogManageContent: ChainBuilder = exec(
-    http("Grant CATALOG_MANAGE_CONTENT Privilege")
-      .put("/api/management/v1/catalogs/#{catalogName}/catalog-roles/#{catalogRoleName}/grants")
-      .header("Authorization", "Bearer #{accessToken}")
-      .header("Content-Type", "application/json")
-      .body(
-        StringBody(
-          """{
-            |  "grant": {
-            |    "type": "catalog",
-            |    "privilege": "CATALOG_MANAGE_CONTENT"
-            |  }
-            |}""".stripMargin
-        )
-      )
-      .check(status.in(201, 403, 404))
-  )
-
-  /**
    * Complete setup: creates principal, roles, and grants all necessary privileges.
+   *
+   * @param createCatalogRole The catalog role creation action from CatalogActions
+   * @param grantCatalogPrivileges The catalog privileges grant action from CatalogActions
    */
-  val setupPrincipalWithAccess: ChainBuilder = exec(
+  def setupPrincipalWithAccess(
+      createCatalogRole: ChainBuilder,
+      grantCatalogPrivileges: ChainBuilder
+  ): ChainBuilder = exec(
     createPrincipal,
+    authActions.savePrincipalCredentials,
     createPrincipalRole,
     createCatalogRole,
     grantPrincipalRole,
     grantCatalogRole,
-    grantCatalogManageContent
+    grantCatalogPrivileges
   )
 }
 
