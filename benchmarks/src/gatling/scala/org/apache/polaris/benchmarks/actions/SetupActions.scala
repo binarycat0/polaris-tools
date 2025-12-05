@@ -75,23 +75,34 @@ case class SetupActions(
    *   - principalName: Name of the principal to create
    *   - principalRoleName: Name of the principal role to create
    *
-   * After execution, the principal credentials (principalClientId, principalClientSecret) will be
-   * saved in the session and in the AuthenticationActions for later use.
+   * After execution:
+   *   - The principal credentials (principalClientId, principalClientSecret) will be saved in the
+   *     session and in the AuthenticationActions for later use.
+   *   - The principal will be authenticated and the access token will be saved in principalAccessToken.
+   *
+   * Flow:
+   *   1. Create principal (using rootToken)
+   *   2. Save principal credentials
+   *   3. Create principal role (using rootToken)
+   *   4. Grant principal role to principal (using rootToken)
+   *   5. Authenticate as principal and save token in principalAccessToken
    */
   val setupPrincipalWithRole: ChainBuilder = exec(
     principalActions.createPrincipal,
     authActions.savePrincipalCredentials,
     principalActions.createPrincipalRole,
-    principalActions.grantPrincipalRole
+    principalActions.grantPrincipalRole,
+    feed(authActions.principalFeeder()),
+    authActions.authPrincipalAndSaveAccessToken
   )
 
   /**
    * Complete setup flow for a single catalog and principal:
    *   1. Authenticate as root
    *   2. Create principal and principal role
-   *   3. Create catalog and catalog role
-   *   4. Grant catalog role to principal role
-   *   5. Authenticate as principal
+   *   3. Authenticate as principal (done within setupPrincipalWithRole)
+   *   4. Create catalog and catalog role
+   *   5. Grant catalog role to principal role
    *
    * Expected session variables:
    *   - principalName: Name of the principal to create
@@ -100,16 +111,16 @@ case class SetupActions(
    *   - catalogRoleName: Name of the catalog role to create
    *   - defaultBaseLocation: Base storage location for the catalog
    *   - storageConfigInfo: Storage configuration JSON
+   *
+   * Note: Principal authentication is now handled within setupPrincipalWithRole, so the
+   * principalAccessToken will be available after that step completes.
    */
   val setupSingleCatalogAndPrincipal: ChainBuilder = exec(
     // Phase 1: Root authentication and setup
     feed(authActions.rootFeeder()),
     authActions.authRootAndSaveAccessToken,
     setupPrincipalWithRole,
-    setupCatalogWithRole,
-    // Phase 2: Principal authentication
-    feed(authActions.principalFeeder()),
-    authActions.authPrincipalAndSaveAccessToken
+    setupCatalogWithRole
   )
 
   /**
@@ -119,7 +130,12 @@ case class SetupActions(
    * Usage:
    *   1. Call setupPrincipalOnce with principal details
    *   2. For each catalog, call setupAdditionalCatalog with catalog details
-   *   3. Finally call authenticateAsPrincipal to switch to principal token
+   *   3. Optionally call authenticateAsPrincipal to refresh the principal token
+   *
+   * Note: Principal authentication is now handled within setupPrincipalWithRole, so the
+   * principalAccessToken will be available immediately after setupPrincipalOnce completes.
+   * The authenticateAsPrincipal step is now optional and only needed if you want to refresh
+   * the token.
    */
   val setupPrincipalOnce: ChainBuilder = exec(
     feed(authActions.rootFeeder()),
@@ -143,8 +159,11 @@ case class SetupActions(
   )
 
   /**
-   * Authenticates as the principal after setup is complete. Call this after setupPrincipalOnce and
-   * all setupAdditionalCatalog calls.
+   * Authenticates as the principal. This can be used to refresh the principal token if needed.
+   *
+   * Note: This is now optional after setupPrincipalOnce since principal authentication is
+   * already performed within setupPrincipalWithRole. Only use this if you need to refresh
+   * the token or re-authenticate.
    */
   val authenticateAsPrincipal: ChainBuilder = exec(
     feed(authActions.principalFeeder()),
