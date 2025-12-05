@@ -158,20 +158,4 @@ case class AuthenticationActions(
         }
         session
       }
-
-  /**
-   * Sets the root access token from the shared reference into the Gatling session. This
-   * operation is useful when a scenario needs to reuse the root authentication token from a previous
-   * scenario.
-   */
-  val setRootAccessTokenInSession: ChainBuilder =
-    exec(session => session.set("accessToken", rootAccessToken.get()))
-
-  /**
-   * Sets the principal access token from the shared reference into the Gatling session. This
-   * operation is useful when a scenario needs to reuse the principal authentication token from a previous
-   * scenario.
-   */
-  val setPrincipalAccessTokenInSession: ChainBuilder =
-    exec(session => session.set("accessToken", principalAccessToken.get()))
 }

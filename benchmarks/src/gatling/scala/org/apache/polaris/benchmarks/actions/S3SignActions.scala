@@ -82,7 +82,7 @@ case class S3SignActions(
   val fetchTableLocation: ChainBuilder = exec(
     http("Fetch Table for S3 Sign")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables/#{tableName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
       .check(jsonPath("$.metadata.location").saveAs("tableLocation"))
   )
@@ -113,7 +113,7 @@ case class S3SignActions(
   }.exec(
     http("Sign S3 Request")
       .post("/api/s3-sign/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables/#{tableName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(

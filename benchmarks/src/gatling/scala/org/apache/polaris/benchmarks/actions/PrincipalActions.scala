@@ -45,7 +45,7 @@ case class PrincipalActions(
   val createPrincipal: ChainBuilder = exec(
     http("Create Principal")
       .post("/api/management/v1/principals")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(
@@ -68,7 +68,7 @@ case class PrincipalActions(
   val createPrincipalRole: ChainBuilder = exec(
     http("Create Principal Role")
       .post("/api/management/v1/principal-roles")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(
@@ -89,7 +89,7 @@ case class PrincipalActions(
   val grantPrincipalRole: ChainBuilder = exec(
     http("Grant Principal Role to Principal")
       .put("/api/management/v1/principals/#{principalName}/principal-roles")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(
@@ -112,7 +112,7 @@ case class PrincipalActions(
       .put(
         "/api/management/v1/principal-roles/#{principalRoleName}/catalog-roles/#{catalogName}"
       )
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(

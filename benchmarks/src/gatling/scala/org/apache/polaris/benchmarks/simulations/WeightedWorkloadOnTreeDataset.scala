@@ -106,7 +106,6 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
         val rnp =
           RandomNumberProvider(wp.weightedWorkloadOnTreeDataset.seed, ((i + 1) * 1000) + threadId)
         scenario(s"Reader-$i-$threadId")
-          .exec(authActions.setPrincipalAccessTokenInSession)
           .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
             exec { session =>
               val tableIndex = dist.sample(dp.maxPossibleTables, rnp)
@@ -137,7 +136,6 @@ class WeightedWorkloadOnTreeDataset extends Simulation {
         val rnp =
           RandomNumberProvider(wp.weightedWorkloadOnTreeDataset.seed, ((i + 1) * 2000) + threadId)
         scenario(s"Writer-$i-$threadId")
-          .exec(authActions.setPrincipalAccessTokenInSession)
           .during(wp.weightedWorkloadOnTreeDataset.durationInMinutes.minutes) {
             exec { session =>
               val tableIndex = dist.sample(dp.maxPossibleTables, rnp)

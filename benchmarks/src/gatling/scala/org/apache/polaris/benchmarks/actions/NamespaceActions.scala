@@ -149,7 +149,7 @@ case class NamespaceActions(
     retryOnHttpStatus(maxRetries, retryableHttpCodes, "Create namespace")(
       http("Create Namespace")
         .post("/api/catalog/v1/#{catalogName}/namespaces")
-        .header("Authorization", "Bearer #{accessToken}")
+        .header("Authorization", session => s"Bearer ${accessToken.get()}")
         .header("Content-Type", "application/json")
         .body(
           StringBody(
@@ -174,7 +174,7 @@ case class NamespaceActions(
   val fetchNamespace: ChainBuilder = exec(
     http("Fetch single namespace")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{namespaceMultipartPath}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
       .check(jsonPath("$.namespace").is("#{namespaceJsonPath}"))
       .check(
@@ -195,7 +195,7 @@ case class NamespaceActions(
   val checkNamespaceExists: ChainBuilder = exec(
     http("Check Namespace Exists")
       .head("/api/catalog/v1/#{catalogName}/namespaces/#{namespaceMultipartPath}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(204))
   )
 
@@ -207,7 +207,7 @@ case class NamespaceActions(
   val fetchAllChildrenNamespaces: ChainBuilder = exec(
     http("Fetch child namespaces")
       .get("/api/catalog/v1/#{catalogName}/namespaces?parent=#{namespaceMultipartPath}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
   )
 
@@ -215,7 +215,7 @@ case class NamespaceActions(
     retryOnHttpStatus(maxRetries, retryableHttpCodes, "Update namespace")(
       http("Update namespace")
         .post("/api/catalog/v1/#{catalogName}/namespaces/#{namespaceMultipartPath}/properties")
-        .header("Authorization", "Bearer #{accessToken}")
+        .header("Authorization", session => s"Bearer ${accessToken.get()}")
         .header("Content-Type", "application/json")
         .body(
           StringBody(

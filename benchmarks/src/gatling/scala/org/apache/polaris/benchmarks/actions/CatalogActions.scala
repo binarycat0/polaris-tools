@@ -81,7 +81,7 @@ case class CatalogActions(
     retryOnHttpStatus(maxRetries, retryableHttpCodes, "Create catalog")(
       http("Create Catalog")
         .post("/api/management/v1/catalogs")
-        .header("Authorization", "Bearer #{accessToken}")
+        .header("Authorization", session => s"Bearer ${accessToken.get()}")
         .header("Content-Type", "application/json")
         .body(
           StringBody(
@@ -111,7 +111,7 @@ case class CatalogActions(
   val fetchCatalog: ChainBuilder = exec(
     http("Fetch Catalog")
       .get("/api/management/v1/catalogs/#{catalogName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .check(status.is(200))
       .check(jsonPath("$.type").is("INTERNAL"))
@@ -127,7 +127,7 @@ case class CatalogActions(
   val fetchAllCatalogs: ChainBuilder = exec(
     http("Fetch all Catalogs")
       .get("/api/management/v1/catalogs")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .check(status.is(200))
   )
@@ -138,7 +138,7 @@ case class CatalogActions(
   val createCatalogRole: ChainBuilder = exec(
     http("Create Catalog Role")
       .post("/api/management/v1/catalogs/#{catalogName}/catalog-roles")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(
@@ -162,7 +162,7 @@ case class CatalogActions(
       exec(
         http(s"Grant $privilege Privilege")
           .put("/api/management/v1/catalogs/#{catalogName}/catalog-roles/#{catalogRoleName}/grants")
-          .header("Authorization", "Bearer #{accessToken}")
+          .header("Authorization", session => s"Bearer ${accessToken.get()}")
           .header("Content-Type", "application/json")
           .body(
             StringBody(

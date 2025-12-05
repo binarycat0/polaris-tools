@@ -151,7 +151,7 @@ case class TableActions(
   val createTable: ChainBuilder = retryOnHttpStatus(maxRetries, retryableHttpCodes, "Create Table")(
     http("Create Table")
       .post("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(
         StringBody(
@@ -182,7 +182,7 @@ case class TableActions(
   val fetchTable: ChainBuilder = exec(
     http("Fetch single Table")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables/#{tableName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
       .check(jsonPath("$.metadata.table-uuid").saveAs("tableUuid"))
       .check(jsonPath("$.metadata.location").is("#{location}"))
@@ -199,7 +199,7 @@ case class TableActions(
   val checkTableExists: ChainBuilder = exec(
     http("Check Table Exists")
       .head("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables/#{tableName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(204))
   )
 
@@ -210,7 +210,7 @@ case class TableActions(
   val fetchAllTables: ChainBuilder = exec(
     http("Fetch children Tables")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
   )
 
@@ -224,7 +224,7 @@ case class TableActions(
     retryOnHttpStatus(maxRetries, retryableHttpCodes, "Update Table")(
       http("Update Table")
         .post("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/tables/#{tableName}")
-        .header("Authorization", "Bearer #{accessToken}")
+        .header("Authorization", session => s"Bearer ${accessToken.get()}")
         .header("Content-Type", "application/json")
         .body(
           StringBody(

@@ -136,7 +136,7 @@ case class ViewActions(
   val createView: ChainBuilder = retryOnHttpStatus(maxRetries, retryableHttpCodes, "Create View")(
     http("Create View")
       .post("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/views")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .header("Content-Type", "application/json")
       .body(StringBody("""{
                          |  "name": "#{viewName}",
@@ -172,7 +172,7 @@ case class ViewActions(
   val fetchView: ChainBuilder = exec(
     http("Fetch single View")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/views/#{viewName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
       .check(jsonPath("$.metadata.view-uuid").saveAs("viewUuid"))
       .check(jsonPath("$.metadata.location").is("#{location}"))
@@ -189,14 +189,14 @@ case class ViewActions(
   val checkViewExists: ChainBuilder = exec(
     http("Check View Exists")
       .head("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/views/#{viewName}")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(204))
   )
 
   val fetchAllViews: ChainBuilder = exec(
     http("Fetch children Views")
       .get("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/views")
-      .header("Authorization", "Bearer #{accessToken}")
+      .header("Authorization", session => s"Bearer ${accessToken.get()}")
       .check(status.is(200))
   )
 
@@ -210,7 +210,7 @@ case class ViewActions(
     retryOnHttpStatus(maxRetries, retryableHttpCodes, "Update View")(
       http("Update View")
         .post("/api/catalog/v1/#{catalogName}/namespaces/#{multipartNamespace}/views/#{viewName}")
-        .header("Authorization", "Bearer #{accessToken}")
+        .header("Authorization", session => s"Bearer ${accessToken.get()}")
         .header("Content-Type", "application/json")
         .body(
           StringBody(

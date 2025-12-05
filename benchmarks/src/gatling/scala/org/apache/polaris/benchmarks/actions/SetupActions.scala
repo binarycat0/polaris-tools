@@ -139,7 +139,6 @@ case class SetupActions(
    *   - storageConfigInfo: Storage configuration JSON
    */
   val setupAdditionalCatalog: ChainBuilder = exec(
-    authActions.setRootAccessTokenInSession,
     setupCatalogWithRole
   )
 

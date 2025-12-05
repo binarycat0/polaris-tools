@@ -66,7 +66,6 @@ class S3SignRequests extends Simulation {
   // --------------------------------------------------------------------------------
   val setupPrincipal: ScenarioBuilder =
     scenario("Setup principal with catalog access")
-      .exec(authActions.setRootAccessTokenInSession)
       .exec { session =>
         session
           .set("principalName", connParams.principalName)
@@ -113,7 +112,6 @@ class S3SignRequests extends Simulation {
   // --------------------------------------------------------------------------------
   val s3SignScenario: ScenarioBuilder =
     scenario("Sign S3 requests for table files")
-      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(s3SignActions.s3SignFeeder())
       .exec(s3SignActions.fetchTableLocation)
       .exec(s3SignActions.signS3Request)

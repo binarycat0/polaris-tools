@@ -94,7 +94,6 @@ class CreateCommits extends Simulation {
   // --------------------------------------------------------------------------------
   val tableUpdateScenario: ScenarioBuilder =
     scenario("Create table commits by updating properties")
-      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(tableActions.propertyUpdateFeeder())
       .exec(tableActions.updateTable)
 
@@ -105,7 +104,6 @@ class CreateCommits extends Simulation {
   // --------------------------------------------------------------------------------
   val viewUpdateScenario: ScenarioBuilder =
     scenario("Create view commits by updating properties")
-      .exec(authActions.setPrincipalAccessTokenInSession)
       .feed(viewActions.propertyUpdateFeeder())
       .exec(viewActions.updateView)
 

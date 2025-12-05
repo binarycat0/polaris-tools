@@ -96,9 +96,8 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify each catalog
   // --------------------------------------------------------------------------------
   private val verifyCatalogs = scenario("Verify catalogs using the Polaris Management REST API")
-    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
-      verifiedCatalogs.getAndIncrement() < dp.numCatalogs && session.contains("accessToken")
+      verifiedCatalogs.getAndIncrement() < dp.numCatalogs
     )(
       feed(catalogActions.feeder())
         .exec(catalogActions.fetchCatalog)
@@ -108,9 +107,8 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify namespaces
   // --------------------------------------------------------------------------------
   private val verifyNamespaces = scenario("Verify namespaces using the Iceberg REST API")
-    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
-      verifiedNamespaces.getAndIncrement() < numNamespaces && session.contains("accessToken")
+      verifiedNamespaces.getAndIncrement() < numNamespaces
     )(
       feed(namespaceActions.namespaceFetchFeeder())
         .exec(namespaceActions.fetchAllChildrenNamespaces)
@@ -122,9 +120,8 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify tables
   // --------------------------------------------------------------------------------
   private val verifyTables = scenario("Verify tables using the Iceberg REST API")
-    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
-      verifiedTables.getAndIncrement() < dp.numTables && session.contains("accessToken")
+      verifiedTables.getAndIncrement() < dp.numTables
     )(
       feed(tableActions.tableFetchFeeder())
         .exec(tableActions.fetchAllTables)
@@ -136,9 +133,8 @@ class ReadTreeDataset extends Simulation {
   // Workload: Verify views
   // --------------------------------------------------------------------------------
   private val verifyViews = scenario("Verify views using the Iceberg REST API")
-    .exec(authenticationActions.setPrincipalAccessTokenInSession)
     .asLongAs(session =>
-      verifiedViews.getAndIncrement() < dp.numViews && session.contains("accessToken")
+      verifiedViews.getAndIncrement() < dp.numViews
     )(
       feed(viewActions.viewFetchFeeder())
         .exec(viewActions.fetchAllViews)
